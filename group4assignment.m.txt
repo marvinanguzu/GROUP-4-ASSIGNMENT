@@ -1,0 +1,712 @@
+clear; close('all'); clc;
+start_toolkit;
+d = epanet('water_system.inp');
+d.plot;
+d.plot('nodes', 'yes', 'fontsize', 12);
+d.plot('links', 'yes', 'fontsize', 12);
+d.plot('linksindex', 'yes', 'fontsize',8);
+d.plot('nodesindex', 'yes', 'fontsize',14);
+d.plot('links', 'yes', 'highlightlink',{'10'}, 'fontsize',8);
+d.plot('highlightnode',{'10', '7'});
+d.plot('point', 'no');
+d.plot('line', 'no');
+
+linkSet1 = d.getLinkNameID(1:4);
+colorLinkSet1 = repmat({'r'},1,length(linkSet1));
+linkSet2 = d.getLinkNameID([5,6,7,8]);
+colorLinkSet2=repmat({'g'},1,length(linkSet2));
+d.plot('highlightlink',[linkSet1 linkSet2],'colorlink',[colorLinkSet1 colorLinkSet2]);
+ 
+nodeSet1 = d.getNodeNameID(1:4);
+colorLinkSet1 = repmat({'y'},1,length(nodeSet1));
+nodeSet2 = d.getNodeNameID([5,6,7,8]);
+colorLinkSet2=repmat({'g'},1,length(nodeSet2));
+d.plot('highlightnode',[nodeSet1 nodeSet2],'colornode',[colorLinkSet1 colorLinkSet2]);
+
+d.plot('legend', 'hide');
+
+d.plot('extend', 'yes');
+d.plot('legendposition', 'EastOutside');
+h = figure;
+d.plot('axes', h);
+h = d.plotGraph;
+title('Network Graph');
+d.plotGraph('nodes', 'yes'); 
+title('Network Graph with node IDs');
+
+d.unload
+%% clear; close('all'); clc;
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp', 'loadfile');
+
+hrs = 100;
+d.setTimeSimulationDuration(hrs*3600);
+
+tic;
+hyd_res_1 = d.getComputedTimeSeries;
+time_1 = toc;
+
+tic;
+hyd_res_2 = d.getComputedHydraulicTimeSeries('time', 'flow', 'pressure'); 
+time_2 = toc;
+
+tic;
+hyd_res_3 = d.getComputedHydraulicTimeSeries('time', 'flow', 'pressure'); 
+time_3 = toc;
+
+tic;
+d.openHydraulicAnalysis;
+d.initializeHydraulicAnalysis;
+tstep=1;P=[];T_H=[];
+while (tstep>0)
+    t=d.runHydraulicAnalysis;
+    P=[P; d.getNodePressure];
+    T_H=[T_H; t];
+    tstep=d.nextHydraulicAnalysisStep;
+end
+d.closeHydraulicAnalysis;
+time_4 = toc;
+
+d.unload
+
+disp(['Elapsed time for the function `getComputedTimeSeries` is: ' num2str(time_1)]);
+disp(['Elapsed time for the function `getComputedTimeSeries_ENepanet` is: ' num2str(time_2)]);
+disp(['Elapsed time for the function `getComputedHydraulicTimeSeries` is: ' num2str(time_3)]);
+disp(['Elapsed time for the function `step-by-step` is: ' num2str(time_4)]);
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp', 'loadfile');
+
+hyd_res = d.getComputedHydraulicTimeSeries('time', 'pressure', 'flow', 'velocity');
+
+hrs_time = hyd_res.Time/3600;
+
+node_indices = [1, 3, 5];
+node_names = d.getNodeNameID(node_indices);
+units = d.getUnits;
+for i=node_indices
+    figure;
+    plot(hrs_time, hyd_res .Pressure(:,i));
+    title(['Pressure for the node id "', d.getNodeNameID{i},'"']);
+    xlabel('Time (hrs)'); 
+    ylabel(['Pressure (', units.NodePressureUnits,')']);
+end
+
+link_indices = [4, 8, 10];
+link_names = d.getNodeNameID(link_indices);
+for i=link_indices
+    figure;
+    plot(hrs_time, hyd_res.Velocity(:,i));
+    title(['Velocity for the link id "', d.getLinkNameID{i},'"']);
+    xlabel('Time (hrs)'); 
+    ylabel(['Velocity (', units.LinkVelocityUnits,')'])
+end
+
+link_indices = [2, 3, 9];
+for i=link_indices
+    figure;
+    plot(hrs_time, hyd_res.Flow(:,i));
+    title(['Flow for the link id "', d.getLinkNameID{i},'"']);
+    xlabel('Time (hrs)'); 
+    ylabel(['Flow (', units.LinkFlowUnits,')'])
+end
+
+d.unload
+%% 
+clear; close('all'); clc;
+start_toolkit;
+d = epanet('water_system.inp');
+hyd_res = d.getComputedTimeSeries;
+
+times = hyd_res.Time;  
+color = 'g';  
+nodenameid = d.getNodeNameID; 
+linknameid = d.getLinkNameID;  
+nodesconnlinks = d.getNodesConnectingLinksID;  
+nodecoords = d.getNodeCoordinates; 
+
+x = nodecoords{1};
+y = nodecoords{2};
+min_coorx = min(x);
+min_coory = min(y);
+max_coorx = max(x);
+max_coory = max(y);
+xsenoff = (max_coorx - min_coorx) * 0.075;
+ysenoff = (max_coory - min_coory) * 0.03;
+
+fig = d.plot('legend', 'hide');
+format long g
+
+time_step =1;
+flow = hyd_res.Flow(time_step,:);
+fontweight = 'bold';
+fontsize = 10;
+for i = d.getLinkIndex
+    value = flow(i);    
+    FromNode=strfind(strcmp(nodesconnlinks(i, 1), nodenameid), 1);
+    ToNode=strfind(strcmp(nodesconnlinks(i, 2), nodenameid), 1);
+
+    if FromNode
+        x1 = double(nodecoords{1}(FromNode));
+        y1 = double(nodecoords{2}(FromNode));
+    end
+    if ToNode
+        x2 = double(nodecoords{1}(ToNode));
+        y2 = double(nodecoords{2}(ToNode));
+    end
+    F = line([x1 nodecoords{3}{i} x2], [y1 nodecoords{4}{i} y2], 'LineWidth', 1, 'Color', color, 'Parent', fig);
+    text((x1+x2)/2-xsenoff, (y1+y2)/2+ysenoff, num2str(value, '%.5f'), 'FontWeight', fontweight, 'Fontsize', fontsize, 'color', color)
+end
+
+time_step = 1;
+pressure = hyd_res.Pressure(time_step,:);
+ysenoff = (max_coory - min_coory) * (-0.04);
+color = 'b';
+fontweight = 'bold';
+fontsize = 10;
+for i = d.getNodeIndex
+    value = pressure(i);
+    coor = d.getNodeCoordinates(i);
+    x = coor(1); 
+    y = coor(2);
+    P = plot(x, y, 'o', 'LineWidth', 2, 'MarkerEdgeColor', color, 'MarkerFaceColor', color, 'MarkerSize', 5);
+    text(x-xsenoff, y+ysenoff, num2str(value, '%.2f'), 'FontWeight', fontweight, 'Fontsize', fontsize, 'color', color)
+end
+legend([F,P], {'Flows', 'Pressures'});
+
+d.unload
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d1 = epanet('water_system.inp', 'ph'); 
+d2 = epanet('water_system2.inp', 'ph');
+
+disp('water_system - Elevations:');
+disp('--------------------');
+d1_Elevs = d1.getNodeElevations;
+disp(d1_Elevs);
+disp('water_system2 - Elevations:');
+disp('------------------');
+d2_Elevs = d2.getNodeElevations;
+disp(d2_Elevs);
+
+disp('water_system - New Elevations:'); 
+disp('----------------------');
+d1.setNodeElevations(d1_Elevs + 200);
+disp(d1.getNodeElevations);
+disp('water_system2 - New Elevations:');
+disp('----------------------');
+d2.setNodeElevations(d2_Elevs + 200);
+disp(d2.getNodeElevations);
+
+d1.plot;
+d2.plot;
+
+d1.unload;
+d2.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');tic;
+
+hours = 100;
+d.setTimeSimulationDuration(hours*3600);
+
+Results = d.getComputedTimeSeries;
+tocResults = toc;tic;
+
+Hydraulics = d.getComputedHydraulicTimeSeries('flow', 'time');  
+tocHydraulics = toc;tic;
+
+Quality = d.getComputedQualityTimeSeries;
+tocQuality = toc;tic;
+
+pipeindex=4;
+nodeindex=6;
+
+d.openHydraulicAnalysis;
+d.initializeHydraulicAnalysis;
+tstep=1;P=[];T_H=[];D=[];H=[];F=[];
+while (tstep>0)
+    t=d.runHydraulicAnalysis;
+    P=[P; d.getNodePressure];
+    D=[D; d.getNodeActualDemand];
+    H=[H; d.getNodeHydraulicHead];
+    F=[F; d.getLinkFlows];
+    T_H=[T_H; t];
+    tstep=d.nextHydraulicAnalysisStep;
+end
+d.closeHydraulicAnalysis;
+
+d.openQualityAnalysis
+d.initializeQualityAnalysis
+tleft=1; P=[];T_Q=[];Q=[];  
+sim_duration = d.getTimeSimulationDuration();
+while (tleft>0 || t < sim_duration)
+    t=d.runQualityAnalysis;
+    Q=[Q; d.getNodeActualQuality];
+    T_Q=[T_Q; t];
+    tleft = d.stepQualityAnalysisTimeLeft;
+end
+d.closeQualityAnalysis;
+
+d.unload
+
+figure;
+plot(Hydraulics.Time, Hydraulics.Flow(:,pipeindex));
+title('d.getComputedHydraulicTimeSeries');
+xlabel('Time (sec)'); ylabel(['Flow (',d.LinkFlowUnits,') - Link ID "',d.LinkNameID{pipeindex},'"'])
+set(gca,'XTickLabel',num2str(get(gca,'XTick').'));
+
+figure;
+plot(T_H, F(:,pipeindex));
+title('step by step Hydraulic Analysis');
+xlabel('Time (sec)'); ylabel(['Flow (',d.LinkFlowUnits,') - Link ID "',d.LinkNameID{pipeindex},'"'])
+set(gca,'XTickLabel',num2str(get(gca,'XTick').'));
+
+figure;
+plot(Results.Time, Results.NodeQuality(:,nodeindex));
+title('d.getComputedTimeSeries (Ignore events)');
+xlabel('Time (sec)'); ylabel(['Node Quality (',d.QualityChemUnits,') - Node ID "',d.NodeNameID{nodeindex},'"'])
+set(gca,'XTickLabel',num2str(get(gca,'XTick').'));
+
+figure;
+plot(Quality.Time, Quality.NodeQuality(:,nodeindex));
+title('d.getComputedQualityTimeSeries');
+xlabel('Time (sec)'); ylabel(['Node Quality (',d.QualityChemUnits,') - Link ID "',d.NodeNameID{nodeindex},'"'])
+set(gca,'XTickLabel',num2str(get(gca,'XTick').'));
+
+figure;
+plot(T_Q, Q(:,nodeindex));
+title('step by step Quality Analysis');
+xlabel('Time (sec)'); ylabel(['Node Quality (',d.QualityChemUnits,') - Link ID "',d.NodeNameID{nodeindex},'"'])
+set(gca,'XTickLabel',num2str(get(gca,'XTick').'));
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+
+link_index=2;
+
+Status = [0 0 0 0 0 1 1 0 0 1 0 1 0 1 0 1 0 1 0 1 0 0 0 0 1 1]';
+d.openHydraulicAnalysis;
+d.initializeHydraulicAnalysis;
+i=1;tstep=1; F=[];
+while (tstep>0)
+    t=d.runHydraulicAnalysis;
+    d.setLinkStatus(link_index, Status(i)); i=i+1;
+    F = [F; d.getLinkFlows];
+    tstep=d.nextHydraulicAnalysisStep;
+end
+d.closeHydraulicAnalysis;
+
+
+d.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+
+disp('Add a CV pipe');
+
+d.plot;
+
+fromNode = d.getNodeNameID{2};
+toNode = d.getNodeNameID{6};
+node_index = d.addLinkPipeCV('CVPipe',fromNode,toNode);
+
+d.plot('links','yes');
+d.unload
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+d.setQualityType('Chlorine', 'mg/L');
+initialQuality = 0.6;
+nodeIndex = d.getNodeReservoirIndex;
+nodeIndex = [nodeIndex d.getNodeTankIndex];
+d.setNodeInitialQuality(nodeIndex, initialQuality * ones(length(nodeIndex),1));
+
+etstep = 3600;
+d.setTimeReportingStep(etstep);
+d.setTimeHydraulicStep(etstep);
+d.setTimeQualityStep(etstep);
+
+d.openHydraulicAnalysis;
+d.openQualityAnalysis;
+d.initializeHydraulicAnalysis(0);
+d.initializeQualityAnalysis(d.ToolkitConstants.EN_NOSAVE);
+
+tstep = 1;
+T = []; P = []; F = []; QN = []; QL = [];
+while (tstep>0)
+    t = d.runHydraulicAnalysis;
+    qt = d.runQualityAnalysis;
+
+    P = [P; d.getNodePressure];
+    F = [F; d.getLinkFlows];
+    
+    QN = [QN; d.getNodeActualQuality];
+    QL = [QL; d.getLinkActualQuality];
+    T = [T; t];
+
+    tstep = d.nextHydraulicAnalysisStep;
+    qtstep = d.nextQualityAnalysisStep;
+end
+d.closeQualityAnalysis;
+d.closeHydraulicAnalysis;
+P
+F
+QN
+QL
+
+d.unload;
+ %% 
+ clear; close('all'); clc;
+start_toolkit;
+d = epanet('water_system.inp', 'ph');
+
+PatternTimeStep=d.TimePatternStep;
+SimulationTime=48;
+
+SourceInjectionRate=10; 
+SourcesInjectionTimes=[5 20];
+
+qunc=0.05;
+d.setQualityType('chem','mg/L')
+
+d.setTimeSimulationDuration(SimulationTime*3600);
+
+
+disp(['Number of Scenarios = NodeCount: ', num2str(d.getNodeCount)]);
+%% 
+clear; close('all'); clc;
+start_toolkit;
+tic;
+
+d=epanet('water_system.inp');
+
+t = d.getBinTimesInfo;
+hydstep = t.BinTimeHydraulicStep;
+duration = t.BinTimeSimulationDuration;
+
+pipe_count = d.getLinkPipeCount;
+pipeIDs = d.getLinkPipeNameID;
+
+spsmax = max(cellfun('length',pipeIDs));
+
+hrs = duration/3600;
+hours = 0:hrs;
+i=1; Time = cell(hrs,1);
+
+for u=1:hrs
+    % Create random status for pipes every hour.
+    status_code = round(rand(1,pipe_count));
+    status(find(status_code)) = {'Open  '};
+    status(find(~status_code)) = {'Closed'};
+    for np=1:pipe_count
+        Time{i} = sprintf('%03d:%02d:00',hours(u), 30);
+        sps = blanks(spsmax-length(pipeIDs{np}));
+        Controls(i,: ) = ['LINK ',pipeIDs{np}, sps,' ', status{np}, ' AT CLOCKTIME ',Time{i}];
+        i=i+1;
+    end
+end
+
+
+
+d.unload;
+toc
+%% 
+clear; close('all'); clc;
+start_toolkit;
+tic;
+
+d=epanet('water_system.inp');
+
+hydstep = d.getTimeHydraulicStep;
+duration = d.getTimeSimulationDuration;
+
+pipe_count = d.getLinkPipeCount;
+pipeIDs = d.getLinkPipeNameID;
+
+spsmax = max(cellfun('length',pipeIDs));
+
+hrs = duration/3600;
+hours = 0:hrs;
+step = 0:hydstep/60:55; 
+i=1; Time = cell(hrs,1);
+
+hrs = duration/3600;
+hours = 0:hrs;
+step = 0:hydstep/60:55; %step 30min
+i=1; Time = cell(hrs,1);
+
+for u=1:hrs
+    % Create random status for pipes every hour.
+    status_code = round(rand(1,pipe_count));
+    status(find(status_code)) = {'Open  '};
+    status(find(~status_code)) = {'Closed'};
+    for j=1:length(step)
+        for np=1:pipe_count
+            Time{i} = sprintf('%03d:%02d:00',hours(u),30);
+            sps = blanks(spsmax-length(pipeIDs{np}));
+            Controls(i,: ) = ['LINK ',pipeIDs{np}, sps,' ', status{np}, ' AT CLOCKTIME ',Time{i}];
+            d.addControls(['LINK ',pipeIDs{np}, sps,' ', status{np}, ' AT CLOCKTIME ',Time{i}]);
+            i=i+1;
+        end
+    end
+end
+
+disp('Create random status')
+figure;
+RES = d.getComputedHydraulicTimeSeries('flow');
+plot(RES.Flow);
+title('Change status of pipes every hour');
+xlabel('Time (hours)');
+
+d.unload;
+toc
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+pipe_count = d.getLinkPipeCount;
+pipe_indices = d.getLinkPipeIndex;
+
+d.openHydraulicAnalysis;
+d.initializeHydraulicAnalysis;
+i=1;tstep=1; F=[];
+while (tstep>0)
+    % Set status random 0/1 for pipes.
+    Status = round(rand(1,pipe_count))';
+
+    t=d.runHydraulicAnalysis;
+    d.setLinkStatus(pipe_indices, Status); i=i+1;
+    F = [F; d.getLinkFlows];
+    tstep=d.nextHydraulicAnalysisStep;
+end
+d.closeHydraulicAnalysis;
+
+plot(F)
+
+d.unload
+%% 
+clc; close all; clear;
+start_toolkit;
+d = epanet('water_system.inp'); 
+
+d.plot
+
+theta = pi/3;
+x = d.getNodeCoordinates{1}';
+y = d.getNodeCoordinates{2}';
+
+v = [x;y];
+
+x_center = x(1);
+y_center = y(1);
+
+center = repmat([x_center; y_center], 1, length(x));
+R = [cos(theta) -sin(theta); sin(theta) cos(theta)];
+
+v = [v(1:11,1),v(12:22,1)];
+s = v - center';     
+so = R*s';           
+vo = so + center; 
+
+x_new = vo(1,:);
+y_new = vo(2,:);
+
+for i=1:d.NodeCount
+    d.setNodeCoordinates(i, [x_new(i) y_new(i)]);
+end
+
+d.plot
+
+d.saveInputFile('rotated.inp');
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+d.deleteControls();
+tankID = '2';
+pumpID = '9';
+
+tankIndex = d.getNodeIndex(tankID);
+pumpIndex = d.getLinkIndex(pumpID);
+tankElevation = d.getNodeElevations(tankIndex);
+
+d.openHydraulicAnalysis;
+d.initializeHydraulicAnalysis(0);
+
+tstep = 1; i = 1;
+T = []; P = []; F = []; S= [];
+
+Below = 110;
+Above = 140;
+tankHead = [];
+while (tstep>0)
+    
+    H = d.getNodeHydraulicHead;
+    tankHead(i) = H(tankIndex)-tankElevation;
+
+    if tankHead(i) < Below
+        d.setLinkStatus(pumpIndex, 1);
+    end
+     if tankHead(i) > Above
+        d.setLinkStatus(pumpIndex, 0);
+    end
+    i = i+1;
+
+    t = d.runHydraulicAnalysis;
+    
+    S = [S; d.getLinkStatus(pumpIndex)];
+    F = [F; d.getLinkFlows];
+    P = [P; d.getNodePressure(1)];
+    T = [T; t];
+    
+    tstep = d.nextHydraulicAnalysisStep;
+end
+d.closeHydraulicAnalysis;
+
+d.unload;
+figure;
+plot(tankHead)
+figure;
+plot(S)
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+d.setOptionsPatternDemandMultiplier(10);
+
+d.setTimeSimulationDuration(0);
+
+d.solveCompleteHydraulics;
+
+deficient_nodes = d.getStatistic.DeficientNodes;
+check_error(abs(deficient_nodes) == 4)
+
+type = 'PDA';
+pmin = 0;
+preq = 0.1;
+pexp = 0.5;
+d.setDemandModel(type, pmin, preq, pexp);
+
+d.solveCompleteHydraulics;
+
+deficient_nodes = d.getStatistic.DeficientNodes;
+demand_reduction = d.getStatistic.DemandReduction;
+check_error(abs(deficient_nodes) == 6)
+check_error(abs(demand_reduction - 32.66) < 0.01)
+
+junctionIndex_12 = d.getNodeIndex('12');
+demand_deficit_12 = d.getNodeDemandDeficit(junctionIndex_12);
+check_error(abs(demand_deficit_12) < 0.01)
+
+junctionIndex_21 = d.getNodeIndex('21');
+demand_deficit_21 = d.getNodeDemandDeficit(junctionIndex_21);
+check_error(abs(demand_deficit_21 - 413.67) < 0.01)
+
+d.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+linkIndex = 3;
+
+linkNodes = d.getLinkNodesIndex(linkIndex);
+disp(linkNodes);
+
+startNode = 2;
+endNode = 4;
+
+d.setLinkNodesIndex(linkIndex, startNode, endNode);
+disp(d.getLinkNodesIndex(linkIndex));
+
+d.getLinkNodesIndex(linkIndex);
+d.reverseLinkNodeIndices(linkIndex);
+d.getLinkNodesIndex(linkIndex);
+
+d.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+
+disp('Node name ids:')
+d.getNodeNameID';
+
+junction_prefix = 'J';
+reservoir_prefix = 'R';
+tank_prefix = 'T';
+
+for i=d.getNodeJunctionIndex
+    d.setNodeNameID(i, [junction_prefix, '-', num2str(i)]);
+end
+
+for i=d.getNodeReservoirIndex
+    d.setNodeNameID(i, [reservoir_prefix, '-', num2str(i)]);
+end
+
+for i=d.getNodeTankIndex
+    d.setNodeNameID(i, [tank_prefix, '-', num2str(i)]);
+end
+
+disp('Node name ids after:')
+d.getNodeNameID';
+
+d.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+G = epanet('water_system.inp');
+Fmean = mean(G.getComputedHydraulicTimeSeries('flow').Flow,1);
+
+Fsign = sign(Fmean);
+Nidx = G.getLinkNodesIndex;
+for i = 1:size(Nidx,1)
+    if Fsign(i) == 1
+        A(Nidx(i,1),Nidx(i,2)) = 1;
+    else
+        A(Nidx(i,2),Nidx(i,1)) = 1;
+    end
+end
+A
+
+G.unload;
+%% 
+clear; close('all'); clc;
+start_toolkit;
+
+d = epanet('water_system.inp');
+values = d.getComputedTimeSeries;
+
+demsJsonTxt = d.toJson(values.Demand);
+flowJsonTxt = d.toJson(values.Flow);
+allJsonTxt = d.toJson(values);
+
+d.toJsonFile(values.Flow, 'Flows');
+d.toJsonFile(values, 'AllValues');
+d.unload;
+
+
+  
+  
+  
+
